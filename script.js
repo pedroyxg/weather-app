@@ -1,18 +1,25 @@
 import { Renderer, Program, Mesh, Triangle, Vec3 } from 'https://unpkg.com/ogl';
 
-// --- ORB SHADER LOGIC ---
+// --- ORB SHADER LOGIC (OPTIMIZED FOR PERFORMANCE) ---
 function initOrb() {
     const container = document.getElementById('orb-canvas-container');
     if (!container) return;
 
-    const renderer = new Renderer({ alpha: true, premultipliedAlpha: false });
+    // OPTIMASI 1: Matikan alpha dan antialias untuk performa maksimal
+    const renderer = new Renderer({ 
+        alpha: false, 
+        antialias: false,
+        depth: false, // Tidak butuh depth buffer
+        powerPreference: "high-performance" // Minta GPU prioritas performa
+    }); 
     const gl = renderer.gl;
-    gl.clearColor(0, 0, 0, 0);
+    // Set warna clear ke hitam pekat sesuai background
+    gl.clearColor(0.02, 0.02, 0.03, 1); 
     container.appendChild(gl.canvas);
 
-    // Shader Code (Ported from React)
+    // OPTIMASI 2: Gunakan 'mediump' (presisi menengah) bukan 'highp'
     const vert = `
-        precision highp float;
+        precision mediump float;
         attribute vec2 position;
         attribute vec2 uv;
         varying vec2 vUv;
@@ -23,40 +30,15 @@ function initOrb() {
     `;
 
     const frag = `
-        precision highp float;
+        precision mediump float;
         uniform float iTime;
         uniform vec3 iResolution;
-        uniform float hue;
         uniform float hover;
         uniform float rot;
-        uniform float hoverIntensity;
         varying vec2 vUv;
 
-        vec3 rgb2yiq(vec3 c) {
-            float y = dot(c, vec3(0.299, 0.587, 0.114));
-            float i = dot(c, vec3(0.596, -0.274, -0.322));
-            float q = dot(c, vec3(0.211, -0.523, 0.312));
-            return vec3(y, i, q);
-        }
-        
-        vec3 yiq2rgb(vec3 c) {
-            float r = c.x + 0.956 * c.y + 0.621 * c.z;
-            float g = c.x - 0.272 * c.y - 0.647 * c.z;
-            float b = c.x - 1.106 * c.y + 1.703 * c.z;
-            return vec3(r, g, b);
-        }
-        
-        vec3 adjustHue(vec3 color, float hueDeg) {
-            float hueRad = hueDeg * 3.14159265 / 180.0;
-            vec3 yiq = rgb2yiq(color);
-            float cosA = cos(hueRad);
-            float sinA = sin(hueRad);
-            float i = yiq.y * cosA - yiq.z * sinA;
-            float q = yiq.y * sinA + yiq.z * cosA;
-            yiq.y = i;
-            yiq.z = q;
-            return yiq2rgb(yiq);
-        }
+        // OPTIMASI 3: Hapus semua fungsi color adjustment (hue) yang berat
+        // Kita pakai noise simpel dan warna statis saja
 
         vec3 hash33(vec3 p3) {
             p3 = fract(p3 * vec3(0.1031, 0.11369, 0.13787));
@@ -80,14 +62,10 @@ function initOrb() {
             return dot(vec4(31.316), n);
         }
 
-        vec4 extractAlpha(vec3 colorIn) {
-            float a = max(max(colorIn.r, colorIn.g), colorIn.b);
-            return vec4(colorIn.rgb / (a + 1e-5), a);
-        }
-
-        const vec3 baseColor1 = vec3(0.611765, 0.262745, 0.996078);
-        const vec3 baseColor2 = vec3(0.298039, 0.760784, 0.913725);
-        const vec3 baseColor3 = vec3(0.062745, 0.078431, 0.600000);
+        // Warna Hardcoded agar tidak hitung ulang
+        const vec3 color1 = vec3(0.61, 0.26, 0.99); // Ungu
+        const vec3 color2 = vec3(0.30, 0.76, 0.91); // Biru Langit
+        const vec3 color3 = vec3(0.06, 0.08, 0.60); // Biru Gelap
         const float innerRadius = 0.6;
         const float noiseScale = 0.65;
 
@@ -99,10 +77,6 @@ function initOrb() {
         }
 
         vec4 draw(vec2 uv) {
-            vec3 color1 = adjustHue(baseColor1, hue);
-            vec3 color2 = adjustHue(baseColor2, hue);
-            vec3 color3 = adjustHue(baseColor3, hue);
-            
             float ang = atan(uv.y, uv.x);
             float len = length(uv);
             float invLen = len > 0.0 ? 1.0 / len : 0.0;
@@ -128,7 +102,7 @@ function initOrb() {
             col = (col + v1) * v2 * v3;
             col = clamp(col, 0.0, 1.0);
             
-            return extractAlpha(col);
+            return vec4(col, 1.0);
         }
 
         vec4 mainImage(vec2 fragCoord) {
@@ -141,16 +115,16 @@ function initOrb() {
             float c = cos(angle);
             uv = vec2(c * uv.x - s * uv.y, s * uv.x + c * uv.y);
             
-            uv.x += hover * hoverIntensity * 0.1 * sin(uv.y * 10.0 + iTime);
-            uv.y += hover * hoverIntensity * 0.1 * sin(uv.x * 10.0 + iTime);
+            // Hover effect (0.4 intensity hardcoded)
+            uv.x += hover * 0.04 * sin(uv.y * 10.0 + iTime);
+            uv.y += hover * 0.04 * sin(uv.x * 10.0 + iTime);
             
             return draw(uv);
         }
 
         void main() {
             vec2 fragCoord = vUv * iResolution.xy;
-            vec4 col = mainImage(fragCoord);
-            gl_FragColor = vec4(col.rgb * col.a, col.a);
+            gl_FragColor = mainImage(fragCoord);
         }
     `;
 
@@ -161,10 +135,8 @@ function initOrb() {
         uniforms: {
             iTime: { value: 0 },
             iResolution: { value: new Vec3(gl.canvas.width, gl.canvas.height, gl.canvas.width / gl.canvas.height) },
-            hue: { value: 0 },
             hover: { value: 0 },
-            rot: { value: 0 },
-            hoverIntensity: { value: 0.4 } // Set default intensity
+            rot: { value: 0 }
         }
     });
 
@@ -173,7 +145,12 @@ function initOrb() {
     function resize() {
         const width = container.clientWidth;
         const height = container.clientHeight;
-        const dpr = window.devicePixelRatio || 1;
+        
+        // --- OPTIMASI 4: Resolusi Rendah (0.15) ---
+        // Ini kuncinya! Render hanya 15% resolusi asli.
+        // Karena ada filter: blur(40px) di CSS, user tidak akan sadar gambarnya pecah.
+        const dpr = 0.15; 
+        
         renderer.setSize(width * dpr, height * dpr);
         gl.canvas.style.width = width + 'px';
         gl.canvas.style.height = height + 'px';
@@ -182,27 +159,33 @@ function initOrb() {
     window.addEventListener('resize', resize);
     resize();
 
-    // Interactive Logic
+    // Throttled Mouse Move Logic
     let targetHover = 0;
     let lastTime = 0;
     let currentRot = 0;
     
-    // Map mouse over entire window for background effect
+    // Throttle event listener agar tidak fire setiap pixel pergerakan mouse
+    let ticking = false;
     window.addEventListener('mousemove', (e) => {
-        const x = e.clientX;
-        const y = e.clientY;
-        const w = window.innerWidth;
-        const h = window.innerHeight;
-        
-        // Simple logic: Closer to center = more hover effect
-        const cx = w/2;
-        const cy = h/2;
-        const dist = Math.sqrt(Math.pow(x-cx, 2) + Math.pow(y-cy, 2));
-        const maxDist = Math.sqrt(Math.pow(w, 2) + Math.pow(h, 2)) / 2;
-        
-        // Inverse distance: 1 at center, 0 at edges
-        const normDist = 1 - Math.min(dist / (maxDist * 0.8), 1);
-        targetHover = normDist; 
+        if (!ticking) {
+            window.requestAnimationFrame(() => {
+                const x = e.clientX;
+                const y = e.clientY;
+                const w = window.innerWidth;
+                const h = window.innerHeight;
+                
+                const cx = w/2;
+                const cy = h/2;
+                const dist = Math.sqrt(Math.pow(x-cx, 2) + Math.pow(y-cy, 2));
+                const maxDist = Math.sqrt(Math.pow(w, 2) + Math.pow(h, 2)) / 2;
+                
+                const normDist = 1 - Math.min(dist / (maxDist * 0.8), 1);
+                targetHover = normDist;
+                
+                ticking = false;
+            });
+            ticking = true;
+        }
     });
 
     requestAnimationFrame(update);
@@ -212,10 +195,10 @@ function initOrb() {
         lastTime = t;
         program.uniforms.iTime.value = t * 0.001;
         
-        // Smoothly update hover uniform
+        // Smooth hover transition
         program.uniforms.hover.value += (targetHover - program.uniforms.hover.value) * 0.05;
         
-        // Rotate slowly
+        // Slow rotation
         currentRot += dt * 0.1;
         program.uniforms.rot.value = currentRot;
 
@@ -223,10 +206,9 @@ function initOrb() {
     }
 }
 
-// Initialize Orb
 initOrb();
 
-// --- REST OF APP LOGIC (ATTACHED TO WINDOW FOR GLOBAL ACCESS) ---
+// --- REST OF APP LOGIC ---
 const GEO_API = "https://geocoding-api.open-meteo.com/v1/search";
 const WEATHER_API = "https://api.open-meteo.com/v1/forecast";
 const AIR_API = "https://air-quality-api.open-meteo.com/v1/air-quality";
@@ -258,12 +240,44 @@ function setLoading(state) { if(state) { ui.loader.classList.remove('hidden'); u
 async function loadAllData(lat, lon, locationName) { setLoading(true); try { const weatherUrl = `${WEATHER_API}?latitude=${lat}&longitude=${lon}&current_weather=true&hourly=temperature_2m,weathercode,uv_index,relativehumidity_2m,visibility&daily=temperature_2m_max,temperature_2m_min,sunrise,sunset&timezone=auto`; const airUrl = `${AIR_API}?latitude=${lat}&longitude=${lon}&current=us_aqi`; const [weatherRes, airRes] = await Promise.all([fetch(weatherUrl), fetch(airUrl)]); const weatherData = await weatherRes.json(); const airData = await airRes.json(); if (weatherData.timezone) { currentCityTimeZone = weatherData.timezone; document.getElementById('timezone-display').innerText = currentCityTimeZone.split('/')[1].toUpperCase().replace('_', ' '); } renderUI(weatherData, airData, locationName); } catch(err) { console.error(err); } finally { setLoading(false); } }
 function renderUI(wData, aData, location) { const current = wData.current_weather; const daily = wData.daily; const desc = getWeatherDesc(current.weathercode); ui.loc.innerText = location; const now = new Date(); ui.date.innerText = now.toLocaleDateString('id-ID', { day: 'numeric', month: 'long', year: 'numeric', timeZone: currentCityTimeZone }); ui.day.innerText = now.toLocaleDateString('id-ID', { weekday: 'long', timeZone: currentCityTimeZone }); ui.temp.innerText = Math.round(current.temperature); ui.cond.innerText = desc.l; ui.high.innerText = Math.round(daily.temperature_2m_max[0]); ui.low.innerText = Math.round(daily.temperature_2m_min[0]); ui.iconLg.innerHTML = `<i data-lucide="${desc.i}" class="w-12 h-12 text-white drop-shadow-md"></i>`; ui.wind.innerText = current.windspeed; ui.windDir.innerText = degToCompass(current.winddirection); const windArrowWrapper = document.getElementById('wind-arrow-wrapper'); if(windArrowWrapper) { windArrowWrapper.style.transform = `rotate(${current.winddirection}deg)`; } let hourIdx = wData.hourly.time.findIndex(t => t === current.time); if (hourIdx === -1) hourIdx = 0; const uvNow = wData.hourly.uv_index[hourIdx]; const uvStat = getUVStatus(uvNow); ui.uv.innerText = uvNow.toFixed(1); ui.uvText.innerText = uvStat.t; const uvBar = document.getElementById('uv-bar'); if(uvBar) { uvBar.className = `progress-fill ${uvStat.c}`; uvBar.style.width = uvStat.w; } ui.sunrise.innerText = daily.sunrise[0].split('T')[1]; ui.sunset.innerText = daily.sunset[0].split('T')[1]; const aqiNow = aData.current.us_aqi; const aqiStat = getAQIStatus(aqiNow); ui.aqiVal.innerText = aqiNow; ui.aqiText.innerText = aqiStat.t; const aqiBar = document.getElementById('aqi-bar'); if(aqiBar) { aqiBar.className = `progress-fill ${aqiStat.c}`; aqiBar.style.width = aqiStat.w; } const humid = wData.hourly.relativehumidity_2m[hourIdx]; const vis = wData.hourly.visibility[hourIdx]; ui.humid.innerText = `${humid}%`; ui.vis.innerText = `${(vis/1000).toFixed(1)} km`; ui.hourly.innerHTML = ''; for(let i = hourIdx; i < hourIdx + 24; i++) { if(!wData.hourly.time[i]) break; const t = wData.hourly.time[i].split('T')[1]; const tmp = Math.round(wData.hourly.temperature_2m[i]); const c = wData.hourly.weathercode[i]; const isNow = i === hourIdx; const borderClass = isNow ? 'border-purple-500/50 bg-white/10 shadow-[0_0_15px_rgba(168,85,247,0.3)]' : 'border-transparent hover:border-white/10 hover:bg-white/5'; const textClass = isNow ? 'text-white font-bold' : 'text-gray-400'; ui.hourly.innerHTML += `<div class="snap-start min-w-[70px] flex flex-col items-center justify-center p-4 rounded-2xl transition-all cursor-default border ${borderClass}"><span class="text-xs mb-3 font-mono ${textClass}">${t}</span><i data-lucide="${getWeatherDesc(c).i}" class="w-6 h-6 text-white mb-2 drop-shadow-sm"></i><span class="text-lg font-bold text-white">${tmp}°</span></div>`; } lucide.createIcons(); ui.content.style.opacity = '1'; }
 
-// Global functions for HTML events
 window.searchCity = async (q) => { setLoading(true); ui.error.classList.add('hidden'); hideSuggestions(); try { const res = await fetch(`${GEO_API}?name=${q}&count=1&language=id&format=json`); const d = await res.json(); if(!d.results) throw new Error(); loadAllData(d.results[0].latitude, d.results[0].longitude, `${d.results[0].name}, ${d.results[0].country_code}`); } catch { ui.error.classList.remove('hidden'); setLoading(false); } };
 
 document.addEventListener('DOMContentLoaded', () => {
-    const grid = document.getElementById('bento-grid'); const cards = document.querySelectorAll('.magic-card'); if(grid) grid.addEventListener('mousemove', e => { cards.forEach(c => { const r = c.getBoundingClientRect(); c.style.setProperty('--mouse-x', `${e.clientX - r.left}px`); c.style.setProperty('--mouse-y', `${e.clientY - r.top}px`); }); }); cards.forEach(c => { c.addEventListener('mousemove', (e) => { const r = c.getBoundingClientRect(); const x = ((e.clientY - r.top)/(r.height/2))*-5; const y = ((e.clientX - r.left)/(r.width/2))*5; gsap.to(c, { rotateX: x, rotateY: y, scale: 0.98, duration: 0.3 }); }); c.addEventListener('mouseleave', () => gsap.to(c, { rotateX: 0, rotateY: 0, scale: 1 })); });
-    const mainCard = document.getElementById('main-weather-card'); if(mainCard) { mainCard.addEventListener('mousemove', (e) => { const rect = mainCard.getBoundingClientRect(); const x = e.clientX - rect.left; const y = e.clientY - rect.top; mainCard.style.setProperty('--mouse-x', `${x}px`); mainCard.style.setProperty('--mouse-y', `${y}px`); }); }
+    // --- OPTIMASI 2: Hapus Event Listener Berat di Mobile ---
+    const isDesktop = window.matchMedia("(min-width: 768px)").matches;
+
+    if (isDesktop) {
+        const grid = document.getElementById('bento-grid'); 
+        const cards = document.querySelectorAll('.magic-card'); 
+        if(grid) grid.addEventListener('mousemove', e => { 
+            cards.forEach(c => { 
+                const r = c.getBoundingClientRect(); 
+                c.style.setProperty('--mouse-x', `${e.clientX - r.left}px`); 
+                c.style.setProperty('--mouse-y', `${e.clientY - r.top}px`); 
+            }); 
+        }); 
+        cards.forEach(c => { 
+            c.addEventListener('mousemove', (e) => { 
+                const r = c.getBoundingClientRect(); 
+                const x = ((e.clientY - r.top)/(r.height/2))*-5; 
+                const y = ((e.clientX - r.left)/(r.width/2))*5; 
+                gsap.to(c, { rotateX: x, rotateY: y, scale: 0.98, duration: 0.3 }); 
+            }); 
+            c.addEventListener('mouseleave', () => gsap.to(c, { rotateX: 0, rotateY: 0, scale: 1 })); 
+        });
+
+        const mainCard = document.getElementById('main-weather-card'); 
+        if(mainCard) { 
+            mainCard.addEventListener('mousemove', (e) => { 
+                const rect = mainCard.getBoundingClientRect(); 
+                const x = e.clientX - rect.left; 
+                const y = e.clientY - rect.top; 
+                mainCard.style.setProperty('--mouse-x', `${x}px`); 
+                mainCard.style.setProperty('--mouse-y', `${y}px`); 
+            }); 
+        }
+    }
+
     startClock();
     window.searchCity("Jakarta");
 });
