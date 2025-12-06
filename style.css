@@ -1,0 +1,105 @@
+/* Reset & Custom Scrollbar */
+.hide-scroll::-webkit-scrollbar { height: 6px; }
+.hide-scroll::-webkit-scrollbar-track { background: rgba(255, 255, 255, 0.02); border-radius: 10px; margin: 0 20px; }
+.hide-scroll::-webkit-scrollbar-thumb { background: rgba(255, 255, 255, 0.1); border-radius: 10px; transition: background 0.3s; }
+.hide-scroll::-webkit-scrollbar-thumb:hover { background: rgba(132, 0, 255, 0.5); }
+
+/* Loader & Animations */
+.loader { border: 3px solid rgba(255,255,255,0.3); border-radius: 50%; border-top: 3px solid #fff; width: 20px; height: 20px; animation: spin 1s linear infinite; }
+@keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+
+.fade-in { animation: fadeIn 0.8s cubic-bezier(0.16, 1, 0.3, 1); }
+@keyframes fadeIn { from { opacity: 0; transform: translateY(20px); } to { opacity: 1; transform: translateY(0); } }
+
+.progress-bg { background: rgba(255,255,255,0.1); border-radius: 99px; height: 6px; width: 100%; overflow: hidden; }
+.progress-fill { height: 100%; border-radius: 99px; transition: width 1s ease-out; }
+
+/* --- BACKGROUND ORB (WEBGL CONTAINER) --- */
+.bg-fixed-layer { 
+    position: fixed; 
+    top: 0; left: 0; width: 100%; height: 100%; 
+    z-index: -10; 
+    overflow: hidden; 
+    background: #020204; 
+}
+
+#orb-canvas-container {
+    width: 100%;
+    height: 100%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    filter: blur(40px); /* Blur yang pas */
+    opacity: 1; 
+    transform: scale(1.1);
+}
+
+/* Starfield Overlay */
+.stars {
+    position: absolute;
+    top: 0; left: 0; width: 100%; height: 100%;
+    background-image: 
+        radial-gradient(1.5px 1.5px at 10% 10%, white 1px, transparent 0),
+        radial-gradient(1px 1px at 50% 50%, white 1px, transparent 0),
+        radial-gradient(1.5px 1.5px at 90% 90%, white 1px, transparent 0);
+    background-size: 800px 800px;
+    opacity: 0.5;
+    pointer-events: none;
+    mix-blend-mode: screen;
+}
+
+/* --- AUTOCOMPLETE --- */
+.suggestions-box {
+    position: absolute; top: calc(100% + 10px); left: 0; right: 0;
+    background: rgba(15, 15, 25, 0.95); backdrop-filter: blur(20px);
+    border: 1px solid rgba(255,255,255,0.15); border-radius: 1rem;
+    max-height: 0; overflow-y: auto; z-index: 100 !important;
+    box-shadow: 0 20px 50px rgba(0,0,0,0.6); opacity: 0;
+    transform: translateY(-10px); pointer-events: none;
+    transition: all 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+}
+.suggestions-box.active { max-height: 300px; opacity: 1; transform: translateY(0); pointer-events: all; padding: 8px 0; }
+.suggestion-item { padding: 12px 20px; cursor: pointer; transition: all 0.2s; display: flex; align-items: center; gap: 12px; border-bottom: 1px solid rgba(255,255,255,0.03); color: #ccc; }
+.suggestion-item:hover { background: rgba(132, 0, 255, 0.2); color: white; padding-left: 24px; }
+
+/* --- SPOTLIGHT CARD --- */
+.card-spotlight {
+    position: relative;
+    border-radius: 1.5rem;
+    overflow: hidden;
+    --mouse-x: 50%;
+    --mouse-y: 50%;
+    --spotlight-color: rgba(255, 255, 255, 0.25);
+}
+.card-spotlight::before {
+    content: '';
+    position: absolute; top: 0; left: 0; right: 0; bottom: 0;
+    background: radial-gradient(circle at var(--mouse-x) var(--mouse-y), var(--spotlight-color), transparent 80%);
+    opacity: 0; transition: opacity 0.5s ease; pointer-events: none; z-index: 2;
+}
+.card-spotlight:hover::before, .card-spotlight:focus-within::before { opacity: 0.6; }
+
+/* --- MAGIC BENTO --- */
+.magic-grid { position: relative; }
+.magic-card {
+    background: rgba(20, 20, 35, 0.4); border: 1px solid rgba(255, 255, 255, 0.08); 
+    position: relative; overflow: hidden; transition: transform 0.1s ease; z-index: 10;
+    backdrop-filter: blur(10px); 
+}
+.magic-card::before { content: ""; position: absolute; inset: -1px; background: radial-gradient(400px circle at var(--mouse-x) var(--mouse-y), rgba(132, 0, 255, 0.4), transparent 40%); opacity: 0; transition: opacity 0.5s; z-index: -1; border-radius: inherit; }
+.magic-card::after { content: ""; position: absolute; inset: 0; background: radial-gradient(300px circle at var(--mouse-x) var(--mouse-y), rgba(132, 0, 255, 0.08), transparent 40%); opacity: 0; transition: opacity 0.5s; z-index: 1; pointer-events: none; }
+.magic-grid:hover .magic-card::before, .magic-grid:hover .magic-card::after { opacity: 1; }
+.particle { position: absolute; width: 4px; height: 4px; background: #8b5cf6; border-radius: 50%; pointer-events: none; z-index: 20; box-shadow: 0 0 10px #8b5cf6; }
+
+/* --- HOURLY SCROLL --- */
+.hourly-scroll-container { display: flex; overflow-x: auto; gap: 12px; padding-bottom: 16px; scroll-behavior: smooth; scroll-snap-type: x mandatory; }
+.hourly-card {
+    flex: 0 0 auto; width: 80px; padding: 16px 0; display: flex; flex-direction: column; align-items: center; justify-content: center;
+    border-radius: 1.5rem; background: rgba(255, 255, 255, 0.03); border: 1px solid rgba(255, 255, 255, 0.05);
+    scroll-snap-align: start; transition: all 0.3s cubic-bezier(0.25, 0.8, 0.25, 1); cursor: pointer; backdrop-filter: blur(5px);
+}
+.hourly-card:hover { transform: translateY(-5px) scale(1.05); background: rgba(255, 255, 255, 0.08); border-color: rgba(132, 0, 255, 0.3); box-shadow: 0 10px 30px -10px rgba(132, 0, 255, 0.3); }
+.hourly-card.active-hour { background: linear-gradient(135deg, rgba(132, 0, 255, 0.8), rgba(90, 0, 180, 0.9)); border: 1px solid rgba(255, 255, 255, 0.2); box-shadow: 0 0 20px rgba(132, 0, 255, 0.4); transform: scale(1.05); }
+.hourly-time { font-family: 'JetBrains Mono', monospace; font-size: 0.7rem; color: #9ca3af; margin-bottom: 0.5rem; }
+.active-hour .hourly-time { color: #e9d5ff; }
+.hourly-temp { font-weight: 700; font-size: 1rem; color: white; margin-top: 0.5rem; }

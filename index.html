@@ -1,0 +1,183 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Super Weather App</title>
+    
+    <!-- Libraries (Tailwind, Lucide, GSAP) -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://unpkg.com/lucide@latest"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.2/gsap.min.js"></script>
+    
+    <!-- Fonts -->
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;700&family=JetBrains+Mono:wght@500&display=swap" rel="stylesheet">
+
+    <!-- Tailwind Config -->
+    <script>
+        tailwind.config = {
+            darkMode: 'class',
+            theme: {
+                extend: {
+                    fontFamily: { 
+                        sans: ['Inter', 'sans-serif'],
+                        mono: ['JetBrains Mono', 'monospace'],
+                    },
+                    colors: {
+                        glass: 'rgba(255, 255, 255, 0.05)',
+                        glassBorder: 'rgba(255, 255, 255, 0.1)',
+                        magicPurple: 'rgba(132, 0, 255, 1)',
+                    }
+                }
+            }
+        }
+    </script>
+
+    <!-- Link ke file CSS terpisah -->
+    <link rel="stylesheet" href="style.css">
+</head>
+<body class="text-white min-h-screen font-sans selection:bg-purple-500 overflow-x-hidden relative">
+
+    <!-- Background Layers -->
+    <div class="bg-fixed-layer">
+        <div id="orb-canvas-container"></div>
+        <div class="stars"></div>
+    </div>
+
+    <!-- Main Container -->
+    <div class="max-w-md mx-auto min-h-screen flex flex-col p-4 md:p-6 md:max-w-3xl lg:max-w-5xl relative z-10">
+        
+        <!-- HEADER -->
+        <header class="flex flex-col md:flex-row justify-between items-center gap-6 mb-8 pt-4 relative z-[9999]">
+            <div class="flex flex-col items-center md:items-start w-full md:w-auto order-2 md:order-1">
+                <div class="inline-flex items-center gap-4 bg-white/5 border border-white/10 px-5 py-2.5 rounded-full backdrop-blur-xl mb-3 shadow-lg hover:bg-white/10 transition-colors cursor-default group">
+                    <div class="flex items-center gap-2">
+                        <span class="relative flex h-2.5 w-2.5">
+                          <span class="animate-ping absolute inline-flex h-full w-full rounded-full bg-red-400 opacity-75"></span>
+                          <span class="relative inline-flex rounded-full h-2.5 w-2.5 bg-red-500"></span>
+                        </span>
+                        <div class="flex flex-col">
+                            <span class="text-[10px] font-bold tracking-[0.2em] text-red-400 uppercase leading-none">LIVE</span>
+                            <span id="timezone-display" class="text-[8px] text-gray-400 font-mono leading-none mt-1">LOKAL</span>
+                        </div>
+                    </div>
+                    <div class="h-6 w-px bg-white/20"></div>
+                    <div class="flex items-center gap-2 font-mono text-lg text-white tracking-widest drop-shadow-sm">
+                        <i data-lucide="clock" class="w-4 h-4 text-purple-400 group-hover:rotate-12 transition-transform duration-500"></i>
+                        <span id="clock-display" class="font-bold">--:--:--</span>
+                    </div>
+                </div>
+
+                <h1 class="text-2xl font-bold flex items-center gap-2 ml-1">
+                    <span id="location-text">Mencari Lokasi...</span>
+                    <i data-lucide="map-pin" class="w-5 h-5 text-purple-400"></i>
+                </h1>
+            </div>
+            
+            <form id="search-form" class="relative w-full md:w-auto order-1 md:order-2" autocomplete="off">
+                <div class="relative group">
+                    <input type="text" id="search-input" placeholder="Ketik nama kota..." 
+                        class="w-full md:w-80 bg-white/5 border border-white/10 text-white text-sm rounded-2xl pl-11 pr-12 py-4 focus:outline-none focus:border-purple-500 focus:bg-[#0f0f1a] transition-all placeholder-gray-500 backdrop-blur-xl shadow-xl relative z-10">
+                    <i data-lucide="search" class="absolute left-4 top-4 w-5 h-5 text-gray-400 z-20 group-focus-within:text-purple-400 transition-colors"></i>
+                    <button type="submit" id="search-btn" class="absolute right-3 top-3 p-1.5 bg-purple-600 hover:bg-purple-500 rounded-xl transition-colors z-20 shadow-lg shadow-purple-900/20">
+                        <i id="btn-icon" data-lucide="arrow-right" class="w-4 h-4 text-white"></i>
+                        <div id="btn-loader" class="loader hidden"></div>
+                    </button>
+                    <!-- Dropdown Container -->
+                    <div id="suggestions-container" class="suggestions-box hide-scroll"></div>
+                </div>
+            </form>
+        </header>
+
+        <!-- ERROR MESSAGE -->
+        <div id="error-msg" class="hidden bg-red-500/20 border border-red-500/50 text-red-200 px-4 py-3 rounded-xl mb-6 text-sm text-center backdrop-blur-md">
+            Kota tidak ditemukan.
+        </div>
+
+        <!-- DASHBOARD CONTENT -->
+        <div id="dashboard-content" class="fade-in opacity-0">
+            <div class="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-8">
+                
+                <!-- MAIN CARD -->
+                <div id="main-weather-card" class="lg:col-span-1 card-spotlight bg-gradient-to-br from-[#2e1065]/90 to-[#1e1b4b]/90 border border-white/10 p-8 shadow-2xl flex flex-col justify-between min-h-[420px] relative backdrop-blur-lg">
+                    <div class="absolute top-[-10%] right-[-10%] w-64 h-64 bg-white/5 rounded-full blur-3xl pointer-events-none"></div>
+                    <div class="relative z-10">
+                        <div class="flex justify-between items-start">
+                            <div id="weather-icon-lg" class="w-20 h-20 bg-white/10 rounded-2xl border border-white/10 flex items-center justify-center backdrop-blur-md shadow-inner">
+                                <i data-lucide="loader" class="animate-spin w-10 h-10 text-white"></i>
+                            </div>
+                            <div class="text-right">
+                                <p id="date-text" class="text-sm font-semibold text-white/90">--</p>
+                                <p id="day-text" class="text-xs font-bold text-white/50 mt-1 uppercase tracking-widest">--</p>
+                            </div>
+                        </div>
+                        <h2 id="condition-text" class="text-3xl font-bold text-white mt-10 leading-tight tracking-tight">Memuat...</h2>
+                    </div>
+                    <div class="mt-8 relative z-10">
+                        <div class="flex items-start">
+                            <span id="temp-main" class="text-8xl font-bold tracking-tighter text-white drop-shadow-xl">--</span>
+                            <span class="text-4xl mt-4 ml-1 font-medium text-white/70">°</span>
+                        </div>
+                        <div class="flex gap-4 mt-6">
+                            <span class="text-sm bg-black/20 px-5 py-2 rounded-full border border-white/5 text-white/80 font-medium backdrop-blur-sm">H: <span id="temp-high" class="text-white font-bold">--</span>°</span>
+                            <span class="text-sm bg-black/20 px-5 py-2 rounded-full border border-white/5 text-white/80 font-medium backdrop-blur-sm">L: <span id="temp-low" class="text-white font-bold">--</span>°</span>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- BENTO GRID -->
+                <div id="bento-grid" class="lg:col-span-2 magic-grid grid grid-cols-2 md:grid-cols-4 gap-3">
+                    <!-- Angin -->
+                    <div class="magic-card rounded-3xl p-5 flex flex-col justify-between group">
+                        <div class="flex justify-between items-start relative z-10"><span class="text-[10px] text-gray-400 uppercase font-bold tracking-widest">Angin</span><i data-lucide="wind" class="w-4 h-4 text-purple-400"></i></div>
+                        <div class="mt-2 relative z-10"><span id="wind-val" class="text-2xl font-bold">--</span> <span class="text-xs text-gray-500">km/h</span></div>
+                        <div class="flex items-center gap-2 mt-2 text-xs text-purple-300 relative z-10"><div class="bg-white/10 p-1 rounded-full"><div id="wind-arrow-wrapper" class="transition-transform duration-500 flex items-center justify-center"><i data-lucide="navigation" class="w-3 h-3"></i></div></div><span id="wind-dir-text">--</span></div>
+                    </div>
+                    <!-- UV -->
+                    <div class="magic-card rounded-3xl p-5 flex flex-col justify-between group">
+                        <div class="flex justify-between items-start relative z-10"><span class="text-[10px] text-gray-400 uppercase font-bold tracking-widest">UV Index</span><i data-lucide="sun" class="w-4 h-4 text-orange-400"></i></div>
+                        <div class="mt-2 relative z-10"><span id="uv-val" class="text-2xl font-bold">--</span><span id="uv-text" class="text-xs block text-gray-400 mt-1">--</span></div>
+                        <div class="progress-bg mt-3 relative z-10"><div id="uv-bar" class="progress-fill bg-orange-500 w-0"></div></div>
+                    </div>
+                    <!-- Fajar -->
+                    <div class="magic-card rounded-3xl p-5 flex flex-col justify-between group">
+                        <div class="flex justify-between items-start relative z-10"><span class="text-[10px] text-gray-400 uppercase font-bold tracking-widest">Fajar</span><i data-lucide="sunrise" class="w-4 h-4 text-yellow-300"></i></div>
+                        <div class="mt-auto relative z-10"><span id="sunrise-val" class="text-xl font-bold">--:--</span></div>
+                    </div>
+                    <!-- Senja -->
+                    <div class="magic-card rounded-3xl p-5 flex flex-col justify-between group">
+                        <div class="flex justify-between items-start relative z-10"><span class="text-[10px] text-gray-400 uppercase font-bold tracking-widest">Senja</span><i data-lucide="sunset" class="w-4 h-4 text-orange-400"></i></div>
+                        <div class="mt-auto relative z-10"><span id="sunset-val" class="text-xl font-bold">--:--</span></div>
+                    </div>
+                    <!-- AQI -->
+                    <div class="magic-card md:col-span-2 rounded-3xl p-5 flex flex-col justify-between group">
+                        <div class="flex justify-between items-start relative z-10"><span class="text-[10px] text-gray-400 uppercase font-bold tracking-widest">Kualitas Udara</span><i data-lucide="activity" class="w-4 h-4 text-green-400"></i></div>
+                        <div class="flex justify-between items-end mt-4 relative z-10"><div><span id="aqi-val" class="text-3xl font-bold">--</span><span id="aqi-text" class="text-xs ml-2 font-bold px-2 py-1 rounded bg-white/10 text-white border border-white/10">--</span></div></div>
+                        <div class="progress-bg mt-4 relative z-10"><div id="aqi-bar" class="progress-fill bg-green-500 w-0 shadow-[0_0_10px_currentColor]"></div></div>
+                    </div>
+                    <!-- Kelembapan -->
+                    <div class="magic-card rounded-3xl p-5 flex flex-col justify-between group">
+                        <div class="flex justify-between items-start relative z-10"><span class="text-[10px] text-gray-400 uppercase font-bold tracking-widest">Kelembapan</span><i data-lucide="droplets" class="w-4 h-4 text-blue-400"></i></div>
+                        <span id="humidity-val" class="text-2xl font-bold mt-2 relative z-10">--%</span>
+                    </div>
+                    <!-- Visibilitas -->
+                    <div class="magic-card rounded-3xl p-5 flex flex-col justify-between group">
+                        <div class="flex justify-between items-start relative z-10"><span class="text-[10px] text-gray-400 uppercase font-bold tracking-widest">Visibilitas</span><i data-lucide="eye" class="w-4 h-4 text-blue-400"></i></div>
+                        <span id="vis-val" class="text-2xl font-bold mt-2 relative z-10">-- km</span>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- HOURLY SCROLL -->
+            <div class="bg-white/5 border border-white/10 rounded-[2rem] p-6 backdrop-blur-xl magic-tilt-card">
+                <h3 class="text-xs font-bold mb-4 pl-1 flex items-center gap-2 text-gray-400 uppercase tracking-widest"><i data-lucide="clock" class="w-4 h-4 text-purple-400"></i> Prakiraan 24 Jam</h3>
+                <div id="hourly-container" class="hourly-scroll-container hide-scroll"></div>
+            </div>
+            <div class="text-center mt-8 text-[10px] text-gray-600 uppercase tracking-widest">Powered by Open-Meteo API</div>
+        </div>
+    </div>
+
+    <!-- Link ke file JavaScript terpisah (Module) -->
+    <script type="module" src="script.js"></script>
+</body>
+</html>
